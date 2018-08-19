@@ -3,10 +3,10 @@ import { createStore } from 'redux';
 import Adapter from 'enzyme-adapter-react-16';
 import React from 'react';
 import { Observable } from 'rxjs/Rx';
-import PropTypes from 'prop-types';
+import { Context } from '../../lib/propTypes';
 import connect from '../../lib/connect';
 import createStreamTransformer from '../../lib/createStreamTransformer';
-import createLazyObservable from '../../lib/createLazyObservable';
+import createRootObservables from '../../lib/createRootObservables';
 
 
 const { mount } = enzyme;
@@ -21,12 +21,17 @@ describe('base scenarios', () => {
     store = createStore(
       (state, { type }) => {
         switch (type) {
-          case 'A':
+          case 'INC_A':
             return {
               ...state,
               a: state.a + 1,
             };
-          case 'C':
+          case 'INC_B':
+            return {
+              ...state,
+              b: state.b + 1,
+            };
+          case 'INC_C':
             return {
               ...state,
               c: state.c + 1,
@@ -49,39 +54,11 @@ describe('base scenarios', () => {
       }),
     )(A);
 
-    const notifyObservers = [];
-    const restruxNotify = Observable.create(
-      (observer) => {
-        notifyObservers.push(observer);
-        observer.next(store.getState());
-        return () => {
-          notifyObservers.splice(notifyObservers.indexOf(observer), 1);
-        };
-      },
-    );
-
-    const {
-      observable: restruxValidate,
-      next: validateComponents,
-    } = createLazyObservable();
-
-    store.subscribe(() => {
-      const state = store.getState();
-      notifyObservers.forEach((o) => { o.next(state); });
-      validateComponents();
-    });
-
     wrapper = mount(
       <Wrapped />,
       {
-        context: {
-          restruxNotify,
-          restruxValidate,
-        },
-        childContextTypes: {
-          restruxNotify: PropTypes.object,
-          restruxValidate: PropTypes.object,
-        }
+        context: createRootObservables(store),
+        childContextTypes: Context,
       },
     );
   });
@@ -96,7 +73,7 @@ describe('base scenarios', () => {
     let alert = wrapper.find(A);
     expect(alert.props().a).toEqual(1);
     expect(alert.props().b).toEqual(2);
-    store.dispatch({ type: 'A' });
+    store.dispatch({ type: 'INC_A' });
     wrapper.update();
     alert = wrapper.find(A);
     expect(alert.props().a).toEqual(2);
@@ -105,9 +82,9 @@ describe('base scenarios', () => {
   it('should only update for expected keys', () => {
     let alert = wrapper.find(A);
     const initialState = wrapper.state();
-    store.dispatch({ type: 'C' });
+    store.dispatch({ type: 'INC_C' });
     expect(initialState).toBe(wrapper.state());
-    store.dispatch({ type: 'A' });
+    store.dispatch({ type: 'INC_A' });
     wrapper.update();
     expect(initialState).not.toBe(wrapper.state());
     alert = wrapper.find(A);
