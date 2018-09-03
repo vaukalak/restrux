@@ -52,7 +52,7 @@ describe('parametrized selectors', () => {
     );
 
     const selectItems = createStreamTransformer(
-      ({ items }) => items
+      ({ items }) => items,
     );
 
     const cachedFunction = (cb) => {
@@ -61,9 +61,9 @@ describe('parametrized selectors', () => {
       let oldResult = initial;
       return (...args) => {
         if (
-          oldResult === initial ||
-          args.length !== oldArgs.length ||
-          args.find((a, i) => a !== oldArgs[i])
+          oldResult === initial
+          || args.length !== oldArgs.length
+          || args.find((a, i) => a !== oldArgs[i])
         ) {
           oldArgs = args;
           oldResult = cb(...args);
@@ -73,12 +73,10 @@ describe('parametrized selectors', () => {
       };
     };
 
-    const selectItemById = cachedFunction((itemId) => {
-      return createCombinedObservable(
-        selectItems,
-        (items) => items[itemId],
-      );
-    });
+    const selectItemById = cachedFunction(itemId => createCombinedObservable(
+      selectItems,
+      items => items[itemId],
+    ));
 
     const Wrapped = connect(
       ({ itemId }) => ({
@@ -136,5 +134,12 @@ describe('parametrized selectors', () => {
     wrapper.setProps({ foo: 'b' });
     wrapper.update();
     expect(initialState).toBe(wrapper.state());
+
+    // anyway updating from redux still works.
+    store.dispatch({ type: 'INC_A' });
+    wrapper.update();
+    expect(initialState).not.toBe(wrapper.state());
+    alert = wrapper.find(A);
+    expect(alert.props().currentValue).toEqual(2);
   });
 });
