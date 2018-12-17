@@ -1,6 +1,6 @@
 import { createStore, combineReducers } from 'redux';
 import { Observable } from 'rxjs';
-import streamCreator from '../lib/streamCreator';
+import mapAndMemoize from '../lib/observables/mapAndMemoize';
 
 describe('foo', () => {
   it('should log', () => {
@@ -34,19 +34,19 @@ describe('foo', () => {
 
     const observable = Observable.from(store);
 
-    const observeFoo = streamCreator(
+    const observeFoo = mapAndMemoize(
       observable,
       s => s.foo,
     );
-    const observeFooA = streamCreator(
+    const observeFooA = mapAndMemoize(
       observeFoo,
       fooValue => fooValue.a,
     );
-    const observeFooB = streamCreator(
+    const observeFooB = mapAndMemoize(
       observeFoo,
       fooValue => fooValue.b,
     );
-    const observerBar = streamCreator(
+    const observerBar = mapAndMemoize(
       observable,
       s => s.bar,
     );

@@ -2,11 +2,10 @@ import * as enzyme from 'enzyme';
 import { createStore } from 'redux';
 import Adapter from 'enzyme-adapter-react-16';
 import React from 'react';
-import { Observable } from 'rxjs/Rx';
-import { Context } from '../../lib/propTypes';
-import connect from '../../lib/connect';
-import createStreamTransformer from '../../lib/createStreamTransformer';
-import createRootObservables from '../../lib/createRootObservables';
+import { Context } from '../../../lib/utils/propTypes';
+import connect from '../../../lib/hocs/connect';
+import selector from '../../../lib/selectors/selector';
+import rootObservables from '../../../lib/observables/rootObservables';
 
 
 const { mount } = enzyme;
@@ -49,15 +48,15 @@ describe('base scenarios', () => {
 
     const Wrapped = connect(
       () => ({
-        a: createStreamTransformer(({ a }) => a),
-        b: createStreamTransformer(({ b }) => b),
+        a: selector(({ a }) => a),
+        b: selector(({ b }) => b),
       }),
     )(A);
 
     wrapper = mount(
       <Wrapped />,
       {
-        context: createRootObservables(store),
+        context: rootObservables(store),
         childContextTypes: Context,
       },
     );

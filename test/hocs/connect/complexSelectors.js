@@ -2,12 +2,11 @@ import * as enzyme from 'enzyme';
 import { createStore } from 'redux';
 import Adapter from 'enzyme-adapter-react-16';
 import React from 'react';
-import { Observable } from 'rxjs/Rx';
-import { Context } from '../../lib/propTypes';
-import connect from '../../lib/connect';
-import createStreamTransformer from '../../lib/createStreamTransformer';
-import createRootObservables from '../../lib/createRootObservables';
-import createCombinedObservable from '../../lib/createCombinedObservable';
+import { Context } from '../../../lib/utils/propTypes';
+import connect from '../../../lib/hocs/connect';
+import selector from '../../../lib/selectors/selector';
+import rootObservables from '../../../lib/observables/rootObservables';
+import createCombinedObservable from '../../../lib/selectors/createCombinedObservable';
 
 
 const { mount } = enzyme;
@@ -56,8 +55,8 @@ describe('complex selectors', () => {
       },
     );
 
-    const selectItems = createStreamTransformer(({ items }) => items);
-    const selectCurrentItem = createStreamTransformer(({ currentItem }) => currentItem);
+    const selectItems = selector(({ items }) => items);
+    const selectCurrentItem = selector(({ currentItem }) => currentItem);
 
     const Wrapped = connect(
       () => ({
@@ -72,7 +71,7 @@ describe('complex selectors', () => {
     wrapper = mount(
       <Wrapped />,
       {
-        context: createRootObservables(store),
+        context: rootObservables(store),
         childContextTypes: Context,
       },
     );

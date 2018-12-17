@@ -1,4 +1,4 @@
-import defaultCache from '../lib/defaultCache';
+import defaultCache from '../lib/utils/defaultCache';
 
 describe('default cache', () => {
   it('should return value on match', () => {

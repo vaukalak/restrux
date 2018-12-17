@@ -2,13 +2,12 @@ import * as enzyme from 'enzyme';
 import { createStore } from 'redux';
 import Adapter from 'enzyme-adapter-react-16';
 import React from 'react';
-import { Observable } from 'rxjs/Rx';
-import { Context } from '../../lib/propTypes';
-import connect from '../../lib/connect';
-import createStreamTransformer from '../../lib/createStreamTransformer';
-import createRootObservables from '../../lib/createRootObservables';
-import createCombinedObservable from '../../lib/createCombinedObservable';
-
+import { Context } from '../../../lib/utils/propTypes';
+import connect from '../../../lib/hocs/connect';
+import selector from '../../../lib/selectors/selector';
+import rootObservables from '../../../lib/observables/rootObservables';
+import createCombinedObservable from '../../../lib/selectors/createCombinedObservable';
+import cachedFunction from '../../../lib/selectors/cachedFunction';
 
 const { mount } = enzyme;
 enzyme.configure({ adapter: new Adapter() });
@@ -51,27 +50,9 @@ describe('parametrized selectors', () => {
       },
     );
 
-    const selectItems = createStreamTransformer(
+    const selectItems = selector(
       ({ items }) => items,
     );
-
-    const cachedFunction = (cb) => {
-      let oldArgs = [];
-      const initial = {};
-      let oldResult = initial;
-      return (...args) => {
-        if (
-          oldResult === initial
-          || args.length !== oldArgs.length
-          || args.find((a, i) => a !== oldArgs[i])
-        ) {
-          oldArgs = args;
-          oldResult = cb(...args);
-          return oldResult;
-        }
-        return oldResult;
-      };
-    };
 
     const selectItemById = cachedFunction(itemId => createCombinedObservable(
       selectItems,
@@ -87,7 +68,7 @@ describe('parametrized selectors', () => {
     wrapper = mount(
       <Wrapped itemId="a" />,
       {
-        context: createRootObservables(store),
+        context: rootObservables(store),
         childContextTypes: Context,
       },
     );

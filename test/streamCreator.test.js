@@ -1,5 +1,5 @@
 import { Observable } from 'rxjs';
-import streamCreator from '../lib/streamCreator';
+import mapAndMemoize from '../lib/observables/mapAndMemoize';
 
 let dispatch;
 
@@ -24,7 +24,7 @@ describe('streamCreator', () => {
 
     dispatch({ x: 1 });
 
-    const stream = streamCreator(observable, ({ x }) => x);
+    const stream = mapAndMemoize(observable, ({ x }) => x);
     const arr = [];
     stream.subscribe((v) => {
       arr.push(v);
@@ -39,8 +39,8 @@ describe('streamCreator', () => {
 
     dispatch({ x: 1 });
 
-    const st1 = streamCreator(observable, ({ x }) => x);
-    const st2 = streamCreator(observable, ({ x }) => x);
+    const st1 = mapAndMemoize(observable, ({ x }) => x);
+    const st2 = mapAndMemoize(observable, ({ x }) => x);
 
     const arr1 = [];
     st1.subscribe((x) => {
@@ -64,7 +64,7 @@ describe('streamCreator', () => {
 
     dispatch({ x: 1 });
 
-    const st1 = streamCreator(observable, ({ x }) => x);
+    const st1 = mapAndMemoize(observable, ({ x }) => x);
 
     const arr1 = [];
     st1.subscribe((x) => {
@@ -81,8 +81,8 @@ describe('streamCreator', () => {
 
     dispatch({ x: 1 });
 
-    const st1 = streamCreator(observable, ({ x }) => x);
-    const st2 = streamCreator(st1, x => x * 2);
+    const st1 = mapAndMemoize(observable, ({ x }) => x);
+    const st2 = mapAndMemoize(st1, x => x * 2);
 
     const arr1 = [];
     st1.subscribe((x) => {
