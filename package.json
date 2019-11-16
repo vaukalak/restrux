@@ -1,6 +1,6 @@
 {
   "name": "restrux",
-  "version": "0.1.0",
+  "version": "1.1.1",
   "description": "observable redux connector",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
