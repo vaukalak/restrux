@@ -1,14 +1,17 @@
 {
   "name": "restrux",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "observable redux connector",
-  "main": "index.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "author": "vaukalak",
   "license": "MIT",
   "scripts": {
     "test": "jest",
     "lint": "eslint test lib",
-    "lint:fix": "npm run lint -- --fix"
+    "lint:fix": "npm run lint -- --fix",
+    "build": "tsc",
+    "postpublish": "git push origin master --follow-tags"
   },
   "dependencies": {
     "eslint": "^5.4.0",
@@ -18,11 +21,12 @@
     "eslint-plugin-jsx-a11y": "^6.1.1",
     "eslint-plugin-react": "^7.11.1",
     "prop-types": "^15.6.2",
-    "react": "^16.3.2",
+    "react": "^16.11.0",
     "redux": "^3.7.2",
-    "rxjs": "^5.5.7"
+    "rxjs": "^6.5.3"
   },
   "devDependencies": {
+    "@types/react": "^16.9.11",
     "babel-cli": "^6.26.0",
     "babel-eslint": "^8.2.2",
     "babel-plugin-transform-es2015-modules-commonjs": "^6.26.0",
@@ -34,6 +38,7 @@
     "enzyme-adapter-react-16": "^1.1.1",
     "jest": "^22.4.3",
     "jest-cli": "^22.4.3",
-    "react-dom": "^16.3.2"
+    "react-dom": "^16.3.2",
+    "typescript": "^3.7.2"
   }
 }
