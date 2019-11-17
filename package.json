@@ -1,6 +1,6 @@
 {
   "name": "restrux",
-  "version": "1.1.4",
+  "version": "1.1.5",
   "description": "observable redux connector",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -15,7 +15,9 @@
     "lint": "eslint test lib",
     "lint:fix": "npm run lint -- --fix",
     "clean": "rimraf dist",
-    "build": "babel src --out-dir dist --extensions \".ts,.tsx\"",
+    "build:js": "babel src --out-dir dist --extensions \".ts,.tsx\"",
+    "build:dts": "tsc --emitDeclarationOnly",
+    "build": "npm run build:js && npm run build:dts",
     "prepublish": "npm run build",
     "postpublish": "git push origin master --follow-tags"
   },
