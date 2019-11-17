@@ -1,17 +1,22 @@
 {
   "name": "restrux",
-  "version": "1.1.2",
+  "version": "1.1.4",
   "description": "observable redux connector",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "author": "vaukalak",
   "license": "MIT",
+  "files": [
+    "dist",
+    "src"
+  ],
   "scripts": {
     "test": "jest",
     "lint": "eslint test lib",
     "lint:fix": "npm run lint -- --fix",
     "clean": "rimraf dist",
-    "build": "babel src --out-dir lib --extensions \".ts,.tsx\"",
+    "build": "babel src --out-dir dist --extensions \".ts,.tsx\"",
+    "prepublish": "npm run build",
     "postpublish": "git push origin master --follow-tags"
   },
   "dependencies": {
