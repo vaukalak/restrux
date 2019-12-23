@@ -32,6 +32,7 @@ const createCombined = <S extends any, R>(
             return entryStream;
           } else {
             // function will take care of caching internaly
+            // eslint-disable-next-line @typescript-eslint/no-use-before-define
             return createStreamSelector(selectorEntry, selectorsPool)(storeStream);
           }
         }

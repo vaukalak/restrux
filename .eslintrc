@@ -1,31 +1,15 @@
 {
-  "parser": "babel-eslint",
-  "env": {
-    "node": true
+  "parser": "@typescript-eslint/parser",
+  "plugins": ["@typescript-eslint"],
+  "parserOptions": {
+    "project": "./tsconfig.json"
   },
-  "globals": {
-    "jest": true,
-    "expect": true,
-    "describe": true,
-    "it": true,
-    "beforeEach": true
-  },
-  "plugins": [],
-  "extends": "airbnb",
-  "settings": {
-    "import/resolver": {
-      "node": {
-        "extensions": [".ts"]
-      }
-    }
-  },
+  "extends": [
+    "plugin:@typescript-eslint/eslint-recommended",
+    "plugin:@typescript-eslint/recommended",
+    "plugin:@typescript-eslint/recommended-requiring-type-checking"
+  ],
   "rules": {
-    "import/prefer-default-export": "off",
-    "implicit-arrow-linebreak": "off",
-    "react/jsx-filename-extension": [1, { "extensions": [".js"] }],
-    "no-mixed-operators": "off",
-    "react/no-typos": "off",
-    "no-prototype-builtins": "off",
-    "no-plusplus": "off",
+    "@typescript-eslint/ban-ts-ignore": "warn",
   }
 }
