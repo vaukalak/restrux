@@ -1,7 +1,13 @@
 import { SelectorDefinition, FunctionOrDefinition } from './definitions/defineSelector';
 import { SelectorsPool, SelectorsPoolEntry } from '../context';
 import { Observable, combineLatest } from 'rxjs';
-import { distinctUntilChanged, map } from 'rxjs/operators';
+import { distinctUntilChanged, map, tap } from 'rxjs/operators';
+
+const createDistinctStream = <T, R>(stream: Observable<T>, transformer: (v: T) => R) => {
+  return stream
+    .pipe(map(transformer))
+    .pipe(distinctUntilChanged());
+}
 
 const createCombined = <S extends any, R>(
   definition: SelectorDefinition<S, R>,
@@ -9,28 +15,31 @@ const createCombined = <S extends any, R>(
   selectorsPool: SelectorsPool<S>,
 ) => {
   const { selectors, combiner } = definition;
-  return combineLatest(selectors.map(
-    (selectorEntry: FunctionOrDefinition<S, any>) => {
-      const cachedEntry = selectorsPool.get(definition) as SelectorsPoolEntry<any>;
-      if (!cachedEntry) {
-        if (typeof selectorEntry === 'function') {
-          const entryStream = storeStream.pipe(map(selectorEntry)).pipe(distinctUntilChanged());
-          selectorsPool.set(
-            selectorEntry,
-            {
-              observable: entryStream,
-              usages: 1,
-            }
-          );
-          return entryStream;
-        } else {
-          // function will take care of caching internaly
-          return createStreamSelector(selectorEntry, selectorsPool)(storeStream);
+  return createDistinctStream(
+    combineLatest(selectors.map(
+      (selectorEntry: FunctionOrDefinition<S, any>) => {
+        const cachedEntry = selectorsPool.get(definition) as SelectorsPoolEntry<any>;
+        if (!cachedEntry) {
+          if (typeof selectorEntry === 'function') {
+            const entryStream = createDistinctStream(storeStream, selectorEntry);
+            selectorsPool.set(
+              selectorEntry,
+              {
+                observable: entryStream,
+                usages: 1,
+              }
+            );
+            return entryStream;
+          } else {
+            // function will take care of caching internaly
+            return createStreamSelector(selectorEntry, selectorsPool)(storeStream);
+          }
         }
+        return cachedEntry.observable;
       }
-      return cachedEntry.observable;
-    }
-  )).pipe(map(arr => combiner(...arr)));
+    )),
+    arr => combiner(...arr)
+  );
 };
 
 const incUsages = (
@@ -86,7 +95,7 @@ export const createStreamFromDefinition = <S extends any, R>(
   const { selectors, combiner } = definition;
   return selectors.length > 0 ?
     createCombined(definition, storeStream, selectorsPool) :
-    storeStream.pipe(map(combiner)).pipe(distinctUntilChanged())
+    createDistinctStream(storeStream, combiner)
 }
 
 export const createStreamSelector = <S extends any, R>(
@@ -98,7 +107,7 @@ export const createStreamSelector = <S extends any, R>(
       const cached = selectorsPool.get(definition) as SelectorsPoolEntry<R>;
       if (!cached) {
         const resultStream = typeof definition === 'function' ?
-          storeStream.pipe(map(definition)).pipe(distinctUntilChanged()) :
+          createDistinctStream(storeStream, definition) :
           createStreamFromDefinition(storeStream, definition, selectorsPool);
         selectorsPool.set(definition, {
           observable: resultStream,
@@ -110,7 +119,11 @@ export const createStreamSelector = <S extends any, R>(
       return cached.observable;
     })();
     return new Observable(observer => {
-      const internalSubscription = internalStream.subscribe(observer);
+      const internalSubscription = internalStream.subscribe(
+        (next) => {
+          observer.next(next);
+        }
+      );
       return () => {
         decUsages(definition, selectorsPool);
         internalSubscription.unsubscribe();
