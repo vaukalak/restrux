@@ -11,7 +11,7 @@ The issue is that performance bugs are not easy ones to catch, which may make yo
 Restrux aims to remove this downside, by streaming parts of your state to target components.
 This will make components been called lazily when there source data has changed, instead of requesing the state on each store change.
 
-# Installation:
+# Installation
 
 ```
 npm i -S restrux
@@ -22,6 +22,8 @@ npm i -S restrux
 ### Define selectors
 
 ```
+import { defineSelector } from 'restrux';
+
 const selectUsers = ({ users }) => users;
 
 const selectCurrentUserId = ({ currentUserId }) => currentUserId;
@@ -35,3 +37,55 @@ const selectedUser = defineSelector(
 
 The `selectedUser` object, is just a spec, that will be later fullfilled to a selector driver.
 It's designed this way, so you can reuse it for both stream based and classic selectors (for example to use it in redux-saga).
+
+### Wrap your app with provider
+
+
+```
+import { Provider } from 'restrux';
+
+const AppWrapper = () => (
+  <Provider store={store}>
+    <App />
+  </ Provider>
+);
+```
+
+### Use selector in your component
+
+```
+import { useMappedStoreState } from 'restrux';
+
+const UserPanel = React.memo(() => {
+  const user = useMappedStoreState(selectedUser);
+  return (
+    <div>
+      {user.name}
+    </div>
+  );
+});
+```
+
+### Use direct manipulation
+
+```
+const UserPanel = React.memo(() => {
+    const stream = useMappedStoreStateStream(selectLoadingProgress);
+    const ref = useRef(null);
+    useEffect(() => {
+        stream.subscribe(progress) => {
+            if (ref.current) {
+                ref.current.style.opacity = progress;
+            }
+        });
+    }, [stream]);
+    
+    return (
+        <data
+          ref={ref}
+        >
+          Loading...
+        </data>
+    );
+});
+```
