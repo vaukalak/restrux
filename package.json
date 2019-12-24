@@ -6,6 +6,10 @@
   "types": "dist/index.d.ts",
   "author": "vaukalak",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vaukalak/restrux"
+  },
   "files": [
     "dist",
     "src"
