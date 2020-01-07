@@ -1,33 +1,6 @@
 import { Observable, Observer, BehaviorSubject } from 'rxjs';
 import React, { createContext, useMemo, useEffect, useRef } from 'react';
-import { FunctionOrDefinition } from '../selectors';
-
-interface Store<S> {
-  subscribe: (listener: () => void) => () => void;
-  getState(): S;
-}
-
-interface ProviderProps<S> {
-  children: React.ReactElement;
-  store: Store<S>;
-}
-
-export type SelectorsPoolEntry<R> = {
-  observable: Observable<R>,
-  usages: number,
-};
-
-export type SelectorsPool<S, R = any> = Map<
-  FunctionOrDefinition<S, R>,
-  SelectorsPoolEntry<R>
->;
-
-type ContextType<S> = {
-  rootStream: Observable<S>,
-  getState: () => S,
-  invalidationStream: Observable<void>,
-  selectorsPool: SelectorsPool<S>,
-};
+import { ContextType, Store, ProviderProps } from '../interfaces';
 
 export const Context = createContext<ContextType<any>>(undefined as any);
 
@@ -59,10 +32,12 @@ const InvalidationSubject = () => {
   return observable;
 }
 
-export const Provider = <S extends any>({ children, store }: ProviderProps<S>) => {
+const useCreateContext = <S extends any>(store: Store<S>) => {
   const unsubscribe = useRef<() => void>();
   const contextValue = useMemo(() => {
     let invalidationStream = InvalidationSubject();
+    let currentInvalidationDepth = 0;
+    let maxInvalidationDepth = 0;
     let rootStream: BehaviorSubject<S> = new BehaviorSubject(store.getState());
     let update = () => {
       // we first update all state subscribers, so if those where modified, they can
@@ -80,6 +55,10 @@ export const Provider = <S extends any>({ children, store }: ProviderProps<S>) =
     return {
       selectorsPool: new Map(),
       getState: () => store.getState(),
+      getCurrentInvalidationDepth: () => currentInvalidationDepth,
+      addInvalidationDepth: (depth) => {
+        maxInvalidationDepth = Math.max(maxInvalidationDepth, depth);
+      },
       rootStream,
       invalidationStream,
     };
@@ -89,6 +68,11 @@ export const Provider = <S extends any>({ children, store }: ProviderProps<S>) =
       unsubscribe.current();
     }
   }, []);
+  return contextValue;
+};
+
+export const Provider = <S extends any>({ children, store }: ProviderProps<S>) => {
+  const contextValue = useCreateContext(store);
   return (
     <Context.Provider value={contextValue}>
       {children}

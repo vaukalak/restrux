@@ -1,134 +1,93 @@
-import { SelectorDefinition, FunctionOrDefinition } from './definitions/defineSelector';
-import { SelectorsPool, SelectorsPoolEntry } from '../context';
-import { Observable, combineLatest } from 'rxjs';
+import { Observable, combineLatest, Subject } from 'rxjs';
 import { distinctUntilChanged, map, tap } from 'rxjs/operators';
+import { SelectorDefinition, FunctionOrDefinition } from './definitions/defineSelector';
+import { SelectorsPool, SelectorObservable, SelectorsPoolEntry, ContextType } from '../interfaces';
+import { createUsage, decUsages, incUsages } from './poolUtils';
 
-const createDistinctStream = <T, R>(stream: Observable<T>, transformer: (v: T) => R) => {
-  return stream
+const createDistinctStream = <T, R>(parentStream: Observable<T>, transformer: (v: T) => R, depth: number) => {
+  const stream: Partial<SelectorObservable<R>> = parentStream
     .pipe(map(transformer))
+    // .pipe(tap(v => console.log('v: ', v)))
     .pipe(distinctUntilChanged());
+  stream.depth = depth;
+  return stream as SelectorObservable<R>;
 }
+
+export const createFromFunctionOrDefinition = <S, R>(
+  definition: FunctionOrDefinition<S, R>,
+  parentStream: Observable<S>,
+  restruxContext: ContextType<S>,
+): SelectorObservable<R> => {
+  const cached = restruxContext.selectorsPool.get(definition) as SelectorsPoolEntry<R>;
+  // console.log('definition: ', definition);
+  // console.log('cached: ', cached);
+  if (cached) {
+    return cached.observable;
+  }
+  let newValue: SelectorObservable<R>;
+  if (typeof definition === 'function') {
+    newValue = createDistinctStream(parentStream, definition, 0);
+  } else {
+    if (definition.selectors.length > 0) {
+      newValue = createCombined(definition, parentStream, restruxContext);
+    } else {
+      newValue = createFromFunctionOrDefinition(definition.combiner, parentStream, restruxContext);
+    }
+  }
+  createUsage(definition, restruxContext.selectorsPool, newValue);
+  return newValue;
+};
 
 const createCombined = <S extends any, R>(
   definition: SelectorDefinition<S, R>,
-  storeStream: Observable<S>,
-  selectorsPool: SelectorsPool<S>,
-) => {
+  parentStream: Observable<S>,
+  restruxContext: ContextType<S>,
+): SelectorObservable<R> => {
   const { selectors, combiner } = definition;
+  const selectorStreams = selectors.map(
+    (definitionEntry) =>
+      createFromFunctionOrDefinition(
+        definitionEntry,
+        parentStream,
+        restruxContext,
+      )
+  );
+  const depth = Math.max(...selectorStreams.map(({ depth }) => depth)) + 1;
   return createDistinctStream(
-    combineLatest(selectors.map(
-      (selectorEntry: FunctionOrDefinition<S, any>) => {
-        const cachedEntry = selectorsPool.get(definition) as SelectorsPoolEntry<any>;
-        if (!cachedEntry) {
-          if (typeof selectorEntry === 'function') {
-            const entryStream = createDistinctStream(storeStream, selectorEntry);
-            selectorsPool.set(
-              selectorEntry,
-              {
-                observable: entryStream,
-                usages: 1,
-              }
-            );
-            return entryStream;
-          } else {
-            // function will take care of caching internaly
-            // eslint-disable-next-line @typescript-eslint/no-use-before-define
-            return createStreamSelector(selectorEntry, selectorsPool)(storeStream);
-          }
-        }
-        return cachedEntry.observable;
-      }
-    )),
-    arr => combiner(...arr)
+    combineLatest(selectorStreams),
+    arr => {
+      console.log('combiner on depth: ', depth);
+      return combiner(...arr);
+    },
+    depth
   );
 };
 
-const incUsages = (
-  definition: FunctionOrDefinition<any, any>,
-  selectorsPool: SelectorsPool<any>,
-) => {
-  selectorsPool.get(definition)!.usages += 1;
-  if (typeof definition === 'function') {
-    return;
-  }
-  definition.selectors.forEach((definitionEntry) => {
-    if (typeof definitionEntry === 'function') {
-      // if selector is in pool, I hope it's children are as well
-      selectorsPool.get(definitionEntry)!.usages += 1;
-    } else {
-      incUsages(definitionEntry, selectorsPool);
+const usageAwareObservable = <S, R>(
+  stream: Observable<R>,
+  definition: FunctionOrDefinition<S, R>,
+  restruxContext: ContextType<S>,
+): Observable<R> => {
+  incUsages(definition, restruxContext.selectorsPool);
+  return new Observable(observer => {
+    const internalSubscription = stream.subscribe(observer);
+    return () => {
+      decUsages(definition, restruxContext.selectorsPool);
+      internalSubscription.unsubscribe();
     }
   });
-}
-
-const decUsages = (
-  definition: FunctionOrDefinition<any, any>,
-  selectorsPool: SelectorsPool<any>,
-) => {
-  const definitionPoolEntry = selectorsPool.get(definition)!;
-  definitionPoolEntry.usages -= 1;
-  // hope it will never be < 0 :)
-  if (definitionPoolEntry.usages <= 0) {
-    selectorsPool.delete(definition)
-  }
-  if (typeof definition === 'function') {
-    return;
-  }
-  definition.selectors.forEach((definitionEntry) => {
-    // if selector is in pool, I hope it's children are as well
-    // we don't unsusbscribe child defintions, cause there cache is managed internaly
-    const poolEntry = selectorsPool.get(definitionEntry)!;
-    if (typeof definitionEntry === 'function') {
-      poolEntry.usages -= 1;
-      // hope it will never be < 0 :)
-      if (poolEntry.usages <= 0) {
-        selectorsPool.delete(definitionEntry)
-      }
-    }
-  });
-}
-
-export const createStreamFromDefinition = <S extends any, R>(
-  storeStream: Observable<S>,
-  definition: SelectorDefinition<S, R>,
-  selectorsPool: SelectorsPool<S>,
-) => {
-  const { selectors, combiner } = definition;
-  return selectors.length > 0 ?
-    createCombined(definition, storeStream, selectorsPool) :
-    createDistinctStream(storeStream, combiner)
 }
 
 export const createStreamSelector = <S extends any, R>(
   definition: FunctionOrDefinition<S, R>,
-  selectorsPool: SelectorsPool<S>
-) => 
-  (storeStream: Observable<S>): Observable<R> => {
-    const internalStream = (() => {
-      const cached = selectorsPool.get(definition) as SelectorsPoolEntry<R>;
-      if (!cached) {
-        const resultStream = typeof definition === 'function' ?
-          createDistinctStream(storeStream, definition) :
-          createStreamFromDefinition(storeStream, definition, selectorsPool);
-        selectorsPool.set(definition, {
-          observable: resultStream,
-          usages: 1,
-        });
-        return resultStream;
-      }
-      incUsages(definition, selectorsPool);
-      return cached.observable;
-    })();
-    return new Observable(observer => {
-      const internalSubscription = internalStream.subscribe(
-        (next) => {
-          observer.next(next);
-        }
-      );
-      return () => {
-        decUsages(definition, selectorsPool);
-        internalSubscription.unsubscribe();
-      }
-    });
-  };
-  
+  restruxContext: ContextType<S>
+) => (parentStream: Observable<S>): Observable<R> =>
+  usageAwareObservable(
+    createFromFunctionOrDefinition(
+      definition,
+      parentStream,
+      restruxContext,
+    ),
+    definition,
+    restruxContext,
+  );
