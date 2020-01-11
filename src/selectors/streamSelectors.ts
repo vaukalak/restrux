@@ -1,7 +1,7 @@
 import { Observable, combineLatest, Subject } from 'rxjs';
-import { distinctUntilChanged, map, tap } from 'rxjs/operators';
+import { distinctUntilChanged, map } from 'rxjs/operators';
 import { SelectorDefinition, FunctionOrDefinition } from './definitions/defineSelector';
-import { SelectorsPool, SelectorObservable, SelectorsPoolEntry, ContextType } from '../interfaces';
+import { SelectorObservable, SelectorsPoolEntry, ContextType } from '../interfaces';
 import { createUsage, decUsages, incUsages } from './poolUtils';
 
 const createDistinctStream = <T, R>(parentStream: Observable<T>, transformer: (v: T) => R, depth: number) => {
@@ -19,8 +19,6 @@ export const createFromFunctionOrDefinition = <S, R>(
   restruxContext: ContextType<S>,
 ): SelectorObservable<R> => {
   const cached = restruxContext.selectorsPool.get(definition) as SelectorsPoolEntry<R>;
-  // console.log('definition: ', definition);
-  // console.log('cached: ', cached);
   if (cached) {
     return cached.observable;
   }
@@ -29,6 +27,7 @@ export const createFromFunctionOrDefinition = <S, R>(
     newValue = createDistinctStream(parentStream, definition, 0);
   } else {
     if (definition.selectors.length > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-use-before-define
       newValue = createCombined(definition, parentStream, restruxContext);
     } else {
       newValue = createFromFunctionOrDefinition(definition.combiner, parentStream, restruxContext);
@@ -53,14 +52,23 @@ const createCombined = <S extends any, R>(
       )
   );
   const depth = Math.max(...selectorStreams.map(({ depth }) => depth)) + 1;
-  return createDistinctStream(
-    combineLatest(selectorStreams),
-    arr => {
-      console.log('combiner on depth: ', depth);
-      return combiner(...arr);
-    },
-    depth
-  );
+  type SelectorSubject = SelectorObservable<R> & Subject<R>;
+  const stableSelectorsSubject: SelectorSubject = new Subject() as any;
+  (stableSelectorsSubject).depth = depth;
+  restruxContext.addInvalidationDepth(depth);
+  let currentValues: any[];
+  combineLatest(selectorStreams).subscribe(value => {
+    currentValues = value;
+    if (restruxContext.getCurrentInvalidationDepth() === depth) {
+      stableSelectorsSubject.next(combiner(...currentValues));
+    }
+  });
+  restruxContext.depthInvalidationStream.subscribe((incomingDepth) => {
+    if (incomingDepth === depth) {
+      stableSelectorsSubject.next(combiner(...currentValues));
+    }
+  })
+  return stableSelectorsSubject;
 };
 
 const usageAwareObservable = <S, R>(

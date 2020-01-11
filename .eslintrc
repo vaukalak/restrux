@@ -11,5 +11,7 @@
   ],
   "rules": {
     "@typescript-eslint/ban-ts-ignore": "warn",
+    "@typescript-eslint/no-empty-function": "off",
+    "@typescript-eslint/unbound-method": "off"
   }
 }

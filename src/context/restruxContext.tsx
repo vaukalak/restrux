@@ -4,13 +4,13 @@ import { ContextType, Store, ProviderProps } from '../interfaces';
 
 export const Context = createContext<ContextType<any>>(undefined as any);
 
-interface InvalidationSubjectLike extends Observable<any> {
-  next(): void;
+interface InvalidationSubjectLike<T> extends Observable<any> {
+  next(data: T): void;
 }
 
-const InvalidationSubject = () => {
-  let invalidationSubscribers: Observer<void>[] = [];
-  let observable: InvalidationSubjectLike = new Observable<void>(
+const InvalidationSubject = <T extends any>() => {
+  let invalidationSubscribers: Observer<T>[] = [];
+  let observable: InvalidationSubjectLike<T> = new Observable<T>(
     (subscriber) => {
       invalidationSubscribers.push(subscriber);
       return () => {
@@ -20,52 +20,72 @@ const InvalidationSubject = () => {
         }
       }
     }
-  ) as InvalidationSubjectLike;
-  observable.next = () => {
+  ) as InvalidationSubjectLike<T>;
+  observable.next = (data: T) => {
     // some items may be created and hence subscribed during notification phase
     const formerInvalidationSubscribers = invalidationSubscribers.concat();
     invalidationSubscribers = [];
     formerInvalidationSubscribers.forEach((subscriber) => {
-      subscriber.next();
+      subscriber.next(data);
     });
   }
   return observable;
 }
 
-const useCreateContext = <S extends any>(store: Store<S>) => {
-  const unsubscribe = useRef<() => void>();
-  const contextValue = useMemo(() => {
-    let invalidationStream = InvalidationSubject();
-    let currentInvalidationDepth = 0;
-    let maxInvalidationDepth = 0;
-    let rootStream: BehaviorSubject<S> = new BehaviorSubject(store.getState());
-    let update = () => {
-      // we first update all state subscribers, so if those where modified, they can
-      // subscribe to invalidation stream
-      rootStream.next(store.getState());
-      invalidationStream.next();
+export const createRestruxContext = <S extends any>(
+  unsubscribeRef: { current: (() => void) | undefined },
+  store: Store<S>,
+) => {
+  let invalidationStream = InvalidationSubject<void>();
+  let depthInvalidationStream = InvalidationSubject<number>();
+  let currentInvalidationDepth = 0;
+  let maxInvalidationDepth = 0;
+  let rootStream: BehaviorSubject<S> = new BehaviorSubject(store.getState());
+  let update = () => {
+    // we first update all state subscribers, so if those where modified, they can
+    // subscribe to invalidation stream
+    rootStream.next(store.getState());
+    while (currentInvalidationDepth < maxInvalidationDepth) {
+      currentInvalidationDepth++;
+      depthInvalidationStream.next(currentInvalidationDepth);
     }
-    if (unsubscribe.current) {
-      unsubscribe.current();
-    }
-    unsubscribe.current = store.subscribe(() => {
-      update();
-    });
+    currentInvalidationDepth = 0;
+    maxInvalidationDepth = 0;
+    invalidationStream.next();
+  }
+  if (unsubscribeRef.current) {
+    unsubscribeRef.current();
+  }
+  unsubscribeRef.current = store.subscribe(() => {
     update();
-    return {
-      selectorsPool: new Map(),
-      getState: () => store.getState(),
-      getCurrentInvalidationDepth: () => currentInvalidationDepth,
-      addInvalidationDepth: (depth) => {
-        maxInvalidationDepth = Math.max(maxInvalidationDepth, depth);
-      },
-      rootStream,
-      invalidationStream,
-    };
-  }, [store]);
+  });
+  update();
+  return {
+    selectorsPool: new Map(),
+    getState: () => store.getState(),
+    getCurrentInvalidationDepth: () => currentInvalidationDepth,
+    addInvalidationDepth: (depth: number) => {
+      maxInvalidationDepth = Math.max(maxInvalidationDepth, depth);
+    },
+    depthInvalidationStream,
+    rootStream,
+    invalidationStream,
+  };
+};
+
+const useCreateContext = <S extends any>(store: Store<S>) => {
+  const unsubscribeRef = useRef<() => void>();
+  unsubscribeRef.current;
+  const contextValue = useMemo(
+    () => createRestruxContext(
+      unsubscribeRef,
+      store,
+    ),
+    [store],
+  );
   useEffect(() => () => {
-    if (unsubscribe.current) {
-      unsubscribe.current();
+    if (unsubscribeRef.current) {
+      unsubscribeRef.current();
     }
   }, []);
   return contextValue;

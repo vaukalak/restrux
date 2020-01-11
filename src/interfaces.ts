@@ -12,8 +12,8 @@ export interface ProviderProps<S> {
 }
 
 export type SelectorsPoolEntry<R> = {
-  observable: SelectorObservable<R>,
-  usages: number,
+  observable: SelectorObservable<R>;
+  usages: number;
 };
 
 export interface SelectorObservable<T> extends Observable<T> {
@@ -26,8 +26,11 @@ export type SelectorsPool<S, R = any> = Map<
 >;
 
 export type ContextType<S> = {
-  rootStream: Observable<S>,
-  getState: () => S,
-  invalidationStream: Observable<void>,
-  selectorsPool: SelectorsPool<S>,
+  rootStream: Observable<S>;
+  getState(): S;
+  getCurrentInvalidationDepth(): number;
+  addInvalidationDepth(depth: number): void;
+  depthInvalidationStream: Observable<number>;
+  invalidationStream: Observable<void>;
+  selectorsPool: SelectorsPool<S>;
 };
